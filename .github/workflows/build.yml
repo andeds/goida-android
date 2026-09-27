@@ -1,50 +1,63 @@
+```yaml
 name: Build Flet APK
+
 on:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
 
-      # 1. Настраиваем Java (необходима для компиляции Android-приложений)
+    steps:
+      # 1. Получаем исходный код
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Java 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
-      # 2. Автоматически разворачиваем Android SDK и соглашаемся со всеми лицензиями
+      # 3. Android SDK
+      # ВАЖНО: v4 вместо v3.
+      # v3 пытается установить устаревший пакет "tools".
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      # 3. Настраиваем стабильный Flutter
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: android-actions/setup-android@v4
         with:
-          channel: 'stable'
+          packages: 'platform-tools'
 
-      # 4. Настраиваем Python
+      # 4. Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 5. Устанавливаем Flet CLI для сборки
-      - name: Install Flet CLI
+      # 5. Устанавливаем Flet
+      - name: Install Flet
         run: |
-          pip install --upgrade pip
-          pip install flet
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade flet
 
-      # 6. Запускаем компиляцию APK
+      # 6. Проверяем Python и Flet
+      - name: Check environment
+        run: |
+          python --version
+          flet --version
+
+      # 7. Собираем APK
       - name: Build Android APK
         run: |
-          flet build apk --title "Goida AI Unlocker" --package-name "com.andeds.goidaunlocker"
+          flet build apk \
+            --title "Goida AI Unlocker" \
+            --package-name "com.andeds.goidaunlocker"
 
-      # 7. Загружаем готовый APK-файл в артефакты GitHub
+      # 8. Загружаем APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Goida-APK
           path: build/apk/*.apk
+          if-no-files-found: error
+```
