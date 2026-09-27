@@ -16,43 +16,48 @@ jobs:
       - name: Install Buildozer dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake wget
 
       - name: Install Buildozer and tools
         run: |
           pip install --upgrade pip
           pip install buildozer cython
 
+      - name: Manual SDK & Sdkmanager Setup
+        run: |
+          # 1. Создаем структуру папок, которую жестко требует Buildozer
+          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin
+          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
+          
+          # 2. Скачиваем официальный стабильный пакет cmdline-tools от Google
+          wget https://google.com -O cmdline.zip
+          unzip cmdline.zip -d cmdline-extracted
+          
+          # 3. Раскладываем sdkmanager и его компоненты в папки, где их будет искать Buildozer
+          cp -r cmdline-extracted/cmdline-tools/* ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/
+          
+          # 4. Решаем баг путей: делаем жесткую ссылку из cmdline-tools в старую папку tools/bin
+          ln -sf ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+          
+          # 5. Принудительно принимаем все лицензии Google через только что установленный sdkmanager
+          yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses --sdk_root=$HOME/.buildozer/android/platform/android-sdk
+          
+          echo "Официальный sdkmanager успешно установлен и лицензирован вручную!"
+
       - name: Init and Configure Buildozer
         run: |
           buildozer init
           
-          # Настройка базовых параметров
+          # Корректируем базовые настройки приложения
           sed -i 's/title = My Application/title = Goida AI Unlocker/g' buildozer.spec
           sed -i 's/package.name = myapp/package.name = goidaunlocker/g' buildozer.spec
           sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
+          
+          # Указываем Buildozer использовать наш уже настроенный SDK и не пытаться качать новый
           sed -i 's/.*android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
           sed -i 's/.*android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
 
-      - name: Fix Sdkmanager Path Bug
-        run: |
-          # 1. Заставляем Buildozer создать базовую структуру папок SDK перед сборкой
-          buildozer android sdk || true
-          
-          # 2. Исправляем баг путей: создаем старую папку, которую ищет Buildozer
-          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-          
-          # 3. Находим, куда Google реально установил sdkmanager, и создаем туда прямую ссылку (Symlink)
-          REAL_SDKMANAGER=$(find ~/.buildozer/android/platform/ -name "sdkmanager" -print -quit)
-          if [ -n "$REAL_SDKMANAGER" ]; then
-            echo "Найден реальный sdkmanager в: $REAL_SDKMANAGER"
-            ln -sf "$REAL_SDKMANAGER" ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-            echo "Баг путей успешно исправлен!"
-          else
-            echo "Предупреждение: sdkmanager еще не скачан, ссылка будет проверена во время сборки."
-          fi
-
       - name: Build APK
         run: |
-          # Запуск чистой сборки без ломающих пайпы команд
+          # Запускаем сборку. Buildozer увидит готовый sdkmanager и сразу перейдет к компиляции
           buildozer -v android debug
