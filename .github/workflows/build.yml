@@ -16,31 +16,29 @@ jobs:
       - name: Install Buildozer and Linux dependencies
         run: |
           sudo apt-get update
-          # Устанавливаем официальный sdkmanager прямо из репозитория Linux (пакет google-android-cmdline-tools-installer)
-          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake wget google-android-cmdline-tools-installer
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake wget
           
-          # Обновляем пип и ставим сборщики
           pip install --upgrade pip
           pip install buildozer cython
 
-      - name: Manual SDK & Sdkmanager Link Fix
+      - name: Pre-Accept Android SDK Licenses
         run: |
-          # 1. Создаем структуру папок, которую жестко требует Buildozer
-          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin
-          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
+          # Создаем пути для лицензий Android SDK во всех возможных структурах (и для старых, и для новых cmdline-tools)
+          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/licenses
           
-          # 2. Находим, куда Linux установил системный sdkmanager
-          SYSTEM_SDKMANAGER="/usr/lib/android-sdk/cmdline-tools/tools/bin/sdkmanager"
+          # Актуальные хэш-ключи согласия с правилами Google Android SDK
+          HASHES="\n24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd\n4948574c468a31d74d17473e072f4f4666551834\nae7a62d34b75f6ef7e1749879532f5a0e3c4046d\n89330d6bcf0562ab0e51311d85fba30a11078098\n2f1153b43334fa9c92139a0ff39088747bc23e44\nafcc46178e3f9b9173a0e12151d3433e14c16f7e"
           
-          # 3. Копируем или связываем системный менеджер с папками Buildozer
-          if [ -f "$SYSTEM_SDKMANAGER" ]; then
-            ln -sf "$SYSTEM_SDKMANAGER" ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager
-            ln -sf "$SYSTEM_SDKMANAGER" ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-            echo "Системный sdkmanager успешно привязан к среде Buildozer!"
-          fi
+          # Записываем лицензии в корень SDK
+          echo -e "$HASHES" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
           
-          # 4. Принудительно принимаем все лицензии Google
-          yes | sdkmanager --licenses --sdk_root=$HOME/.buildozer/android/platform/android-sdk || true
+          # Дублируем лицензии в папку cmdline-tools (баг новых версий Google SDK)
+          echo -e "$HASHES" > ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/licenses/android-sdk-license
+          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/licenses/android-sdk-preview-license
+          
+          echo "Все глобальные лицензии успешно внедрены в папки окружения!"
 
       - name: Init and Configure Buildozer
         run: |
@@ -51,10 +49,11 @@ jobs:
           sed -i 's/package.name = myapp/package.name = goidaunlocker/g' buildozer.spec
           sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
           
-          # Указываем использовать уже настроенные лицензии
+          # Включаем флаги согласия внутри конфигуратора
           sed -i 's/.*android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
           sed -i 's/.*android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
 
       - name: Build APK
         run: |
+          # Запускаем чистую сборку. Buildozer сам скачает sdkmanager, увидит файлы лицензий и пойдет дальше
           buildozer -v android debug
