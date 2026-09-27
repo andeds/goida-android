@@ -4,7 +4,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -13,47 +13,47 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Buildozer and Linux dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake wget
-          
+
+      - name: Install Buildozer and Cython
+        run: |
           pip install --upgrade pip
           pip install buildozer cython
-
-      - name: Pre-Accept Android SDK Licenses
-        run: |
-          # Создаем пути для лицензий Android SDK во всех возможных структурах (и для старых, и для новых cmdline-tools)
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/licenses
-          
-          # Актуальные хэш-ключи согласия с правилами Google Android SDK
-          HASHES="\n24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd\n4948574c468a31d74d17473e072f4f4666551834\nae7a62d34b75f6ef7e1749879532f5a0e3c4046d\n89330d6bcf0562ab0e51311d85fba30a11078098\n2f1153b43334fa9c92139a0ff39088747bc23e44\nafcc46178e3f9b9173a0e12151d3433e14c16f7e"
-          
-          # Записываем лицензии в корень SDK
-          echo -e "$HASHES" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
-          
-          # Дублируем лицензии в папку cmdline-tools (баг новых версий Google SDK)
-          echo -e "$HASHES" > ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/licenses/android-sdk-license
-          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/licenses/android-sdk-preview-license
-          
-          echo "Все глобальные лицензии успешно внедрены в папки окружения!"
 
       - name: Init and Configure Buildozer
         run: |
           buildozer init
           
-          # Корректируем базовые настройки приложения
-          sed -i 's/title = My Application/title = Goida AI Unlocker/g' buildozer.spec
-          sed -i 's/package.name = myapp/package.name = goidaunlocker/g' buildozer.spec
-          sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
+          # Настройка базовых параметров
+          sed -i 's/^title =.*/title = Goida AI Unlocker for Android/g' buildozer.spec
+          sed -i 's/^package.name =.*/package.name = goidaunlocker/g' buildozer.spec
+          sed -i 's/^requirements =.*/requirements = python3,kivy,pyjnius/g' buildozer.spec
           
-          # Включаем флаги согласия внутри конфигуратора
-          sed -i 's/.*android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
-          sed -i 's/.*android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
+          # Защита от бага 37 версии build-tools: принудительно фиксируем стабильную 35.0.0
+          sed -i 's/^#android.build_tools_version =.*/android.build_tools_version = 35.0.0/g' buildozer.spec
+          sed -i 's/^#android.api =.*/android.api = 35/g' buildozer.spec
+          
+          # Разрешения и автоматическое принятие лицензий
+          sed -i 's/^#android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
+          sed -i 's/^#android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
+
+      - name: Pre-accept Android SDK Licenses
+        run: |
+          # Создаем пути для лицензий до запуска основного шага p4a
+          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+          HASHES="\n24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd\n4948574c468a31d74d17473e072f4f4666551834\nae7a62d34b75f6ef7e1749879532f5a0e3c4046d\n89330d6bcf0562ab0e51311d85fba30a11078098"
+          echo -e "$HASHES" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
 
       - name: Build APK
         run: |
-          # Запускаем чистую сборку. Buildozer сам скачает sdkmanager, увидит файлы лицензий и пойдет дальше
-          buildozer -v android debug
+          # Запускаем сборку, подставляя флаг автоматического согласия в интерактивные запросы gradle/p4a
+          yes | buildozer -v android debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Goida-AI-Unlocker-APK
+          path: bin/*.apk
