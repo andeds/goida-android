@@ -5,7 +5,6 @@ from kivy.uix.label import Label
 from kivy.core.window import Window
 from kivy.utils import platform
 
-# Настройка размера окна только для тестов на ПК
 if platform not in ['android', 'ios']:
     Window.size = (360, 640)
 
@@ -32,49 +31,38 @@ class GoidaApp(App):
 
     def toggle_unlock(self, instance):
         if "Отключено" in self.status_label.text:
-            # Если код запущен на смартфоне Android
             if platform == 'android':
                 try:
                     from jnius import autoclass
                     
-                    # 1. Получаем доступ к текущему контексту Android
                     PythonActivity = autoclass('org.kivy.android.PythonActivity')
                     current_activity = PythonActivity.mActivity
-                    
-                    # 2. Инициализируем системный класс VpnService
                     VpnService = autoclass('android.net.VpnService')
                     
-                    # 3. Проверяем, разрешил ли пользователь VPN-туннель
+                    # Проверяем и запрашиваем системное разрешение на создание VPN
                     intent = VpnService.prepare(current_activity)
                     if intent is not None:
-                        # Показываем системный запрос Android на включение VPN
                         current_activity.startActivityForResult(intent, 0)
-                        self.status_label.text = "Предоставьте разрешение\nна VPN в системе!"
+                        self.status_label.text = "Подтвердите запрос\nв окне Android"
                         return
                     
-                    # 4. Если разрешение уже есть, создаем туннель и подменяем DNS
+                    # Передаем управление системному Android DNS
                     builder = VpnService.Builder(current_activity)
                     builder.addAddress("10.0.0.2", 32)
+                    builder.addDnsServer("176.103.130.130") # Comss DNS для обхода
+                    builder.setSession("GoidaAI")
                     
-                    # Задаем DNS-сервер, который умеет обходить блокировки ИИ
-                    builder.addDnsServer("176.103.130.130") 
-                    builder.addDnsServer("176.103.130.131")
-                    builder.setSession("GoidaAIUnlocker")
-                    
-                    # Запуск туннеля
                     self.vpn_interface = builder.establish()
                     self.status_label.text = "Goida AI Unlocker\n[Статус: АКТИВИРОВАНО]"
                     
                 except Exception as e:
-                    self.status_label.text = f"Ошибка Android API:\n{str(e)}"
+                    self.status_label.text = f"Ошибка запуска:\n{str(e)}"
             else:
-                # Логика для теста на ПК (оставляем старую)
                 self.status_label.text = "Goida AI Unlocker\n[Статус: АКТИВИРОВАНО (ПК-Тест)]"
             
             self.btn.text = "Выключить"
             self.btn.background_color = (0.8, 0.2, 0.2, 1)
         else:
-            # Выключение обхода
             if platform == 'android' and hasattr(self, 'vpn_interface') and self.vpn_interface:
                 try:
                     self.vpn_interface.close()
