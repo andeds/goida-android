@@ -1,4 +1,4 @@
-```yaml
+
 name: Build Flet APK
 
 on:
@@ -60,4 +60,3 @@ jobs:
           name: Goida-APK
           path: build/apk/*.apk
           if-no-files-found: error
-```
