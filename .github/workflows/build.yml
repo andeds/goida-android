@@ -32,10 +32,20 @@ jobs:
           sed -i 's/#android.permissions =/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
           sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
           sed -i 's/#android.accept_sdk_license = False/android.accept_sdk_license = True/g' buildozer.spec
+
+      - name: Auto-Accept Android SDK Licenses
+        run: |
+          # 1. Вызываем встроенный менеджер SDK, чтобы он скачал базовые компоненты
+          buildozer android sdk || true
           
-          # Фикс лицензий: автоматически соглашаемся со всеми правилами Google Android SDK
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd\n4948574c468a31d74d17473e072f4f4666551834" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          # 2. Находим утилиту sdkmanager внутри папки buildozer и принудительно принимаем все лицензии
+          SDKMANAGER_PATH=$(find ~/.buildozer/ -name "sdkmanager" -print -quit)
+          if [ -n "$SDKMANAGER_PATH" ]; then
+            echo "Найдена утилита sdkmanager, принимаем лицензии..."
+            yes | $SDKMANAGER_PATH --licenses
+          else
+            echo "sdkmanager не найден на этом этапе, лицензии будут приняты встроенным методом"
+          fi
 
       - name: Build APK
         run: buildozer -v android debug
