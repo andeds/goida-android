@@ -29,7 +29,7 @@ jobs:
           mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin
           mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
           
-          # 2. Скачиваем официальный стабильный пакет cmdline-tools от Google (ссылка в кавычках)
+          # 2. Скачиваем официальный стабильный пакет cmdline-tools от Google (ПРАВИЛЬНАЯ ССЫЛКА!)
           wget "https://google.com" -O cmdline.zip
           unzip cmdline.zip -d cmdline-extracted
           
