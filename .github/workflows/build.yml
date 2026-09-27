@@ -23,37 +23,36 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython
 
-      - name: Init Buildozer Configuration
+      - name: Init and Configure Buildozer
         run: |
           buildozer init
-          # Настраиваем основные параметры нашего приложения
-          sed -i 's/title = My Application/title = Goida AI Unlocker for Android/g' buildozer.spec
+          
+          # Настройка базовых параметров
+          sed -i 's/title = My Application/title = Goida AI Unlocker/g' buildozer.spec
           sed -i 's/package.name = myapp/package.name = goidaunlocker/g' buildozer.spec
           sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
-          sed -i 's/.*android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
           sed -i 's/.*android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
+          sed -i 's/.*android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
 
-      - name: Force Accept All Google Android Licenses
+      - name: Fix Sdkmanager Path Bug
         run: |
-          # Создаем папки лицензий во всех возможных местах, куда может обратиться компилятор
-          mkdir -p ~/.android
-          touch ~/.android/repositories.cfg
+          # 1. Заставляем Buildozer создать базовую структуру папок SDK перед сборкой
+          buildozer android sdk || true
           
-          # Генерируем официальные хэш-ключи согласия для всех типов лицензий Google SDK (включая build-tools 37)
-          for LICENSE_DIR in "$HOME/.buildozer/android/platform/android-sdk/licenses" "$HOME/android-sdk/licenses"; do
-            mkdir -p "$LICENSE_DIR"
-            echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd\n4948574c468a31d74d17473e072f4f4666551834\nae7a62d34b75f6ef7e1749879532f5a0e3c4046d\n89330d6bcf0562ab0e51311d85fba30a11078098\n2f1153b43334fa9c92139a0ff39088747bc23e44\nafcc46178e3f9b9173a0e12151d3433e14c16f7e" > "$LICENSE_DIR/android-sdk-license"
-            echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$LICENSE_DIR/android-sdk-preview-license"
-          done
-          echo "Все глобальные лицензии Google принудительно добавлены!"
+          # 2. Исправляем баг путей: создаем старую папку, которую ищет Buildozer
+          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
+          
+          # 3. Находим, куда Google реально установил sdkmanager, и создаем туда прямую ссылку (Symlink)
+          REAL_SDKMANAGER=$(find ~/.buildozer/android/platform/ -name "sdkmanager" -print -quit)
+          if [ -n "$REAL_SDKMANAGER" ]; then
+            echo "Найден реальный sdkmanager в: $REAL_SDKMANAGER"
+            ln -sf "$REAL_SDKMANAGER" ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+            echo "Баг путей успешно исправлен!"
+          else
+            echo "Предупреждение: sdkmanager еще не скачан, ссылка будет проверена во время сборки."
+          fi
 
       - name: Build APK
         run: |
-          # Запускаем сборку с передачей автоматического согласия на любые непредвиденные вопросы
-          yes | buildozer -v android debug
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Goida-AI-Unlocker-APK
-          path: bin/*.apk
+          # Запуск чистой сборки без ломающих пайпы команд
+          buildozer -v android debug
