@@ -1,6 +1,6 @@
 name: Build APK
 on:
-  workflow_dispatch: # Позволяет запускать сборку кнопкой вручную
+  workflow_dispatch:
 
 jobs:
   build:
@@ -11,24 +11,24 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.9'
 
       - name: Install Buildozer dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake
 
-      - name: Install Buildozer
-        run: pip install buildozer Cython==0.29.36
+      - name: Install Buildozer and Cython
+        run: pip install buildozer==1.5.0 Cython==0.29.33
 
       - name: Init and Configure Buildozer
         run: |
           buildozer init
-          # Автоматически настраиваем разрешения для VPN и интернета в файле настроек
           sed -i 's/title = My Application/title = Goida AI Unlocker/g' buildozer.spec
           sed -i 's/package.name = myapp/package.name = goidaunlocker/g' buildozer.spec
           sed -i 's/#android.permissions =/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
-          sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
+          sed -i 's/requirements = python3,kivy/requirements = python3==3.9.9,kivy,pyjnius/g' buildozer.spec
+          sed -i 's/#android.accept_sdk_license = False/android.accept_sdk_license = True/g' buildozer.spec
 
       - name: Build APK
         run: buildozer -v android debug
