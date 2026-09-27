@@ -16,42 +16,41 @@ jobs:
       - name: Install Buildozer dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake wget
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake
 
       - name: Install Buildozer and tools
         run: |
           pip install --upgrade pip
           pip install buildozer cython
 
-      - name: Pre-install Android SDK Build-Tools 34 (Fix Aidl)
-        run: |
-          # Вручную создаем структуру папок, которую ожидает Buildozer
-          mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0
-          
-          # Скачиваем официальные стабильные инструменты Google (34-ю версию)
-          wget https://google.com -O build-tools.zip
-          unzip build-tools.zip
-          
-          # Обманываем Buildozer: подсовываем стабильные файлы (включая утилиту aidl) в папку 37.0.0
-          cp -r android-14/* ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0/
-          
-          # Проверяем, что обман сработал и файл на месте
-          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0/aidl
-          echo "Утилита Aidl успешно внедрена вручную!"
-
-      - name: Init and Configure Buildozer
+      - name: Init Buildozer Configuration
         run: |
           buildozer init
-          sed -i 's/title = My Application/title = Goida AI Unlocker/g' buildozer.spec
+          # Настраиваем основные параметры нашего приложения
+          sed -i 's/title = My Application/title = Goida AI Unlocker for Android/g' buildozer.spec
           sed -i 's/package.name = myapp/package.name = goidaunlocker/g' buildozer.spec
           sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
-          sed -i 's/.*android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
           sed -i 's/.*android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
+          sed -i 's/.*android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
+
+      - name: Force Accept All Google Android Licenses
+        run: |
+          # Создаем папки лицензий во всех возможных местах, куда может обратиться компилятор
+          mkdir -p ~/.android
+          touch ~/.android/repositories.cfg
+          
+          # Генерируем официальные хэш-ключи согласия для всех типов лицензий Google SDK (включая build-tools 37)
+          for LICENSE_DIR in "$HOME/.buildozer/android/platform/android-sdk/licenses" "$HOME/android-sdk/licenses"; do
+            mkdir -p "$LICENSE_DIR"
+            echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd\n4948574c468a31d74d17473e072f4f4666551834\nae7a62d34b75f6ef7e1749879532f5a0e3c4046d\n89330d6bcf0562ab0e51311d85fba30a11078098\n2f1153b43334fa9c92139a0ff39088747bc23e44\nafcc46178e3f9b9173a0e12151d3433e14c16f7e" > "$LICENSE_DIR/android-sdk-license"
+            echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$LICENSE_DIR/android-sdk-preview-license"
+          done
+          echo "Все глобальные лицензии Google принудительно добавлены!"
 
       - name: Build APK
         run: |
-          # Запуск сборки
-          buildozer -v android debug
+          # Запускаем сборку с передачей автоматического согласия на любые непредвиденные вопросы
+          yes | buildozer -v android debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
