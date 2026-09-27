@@ -29,8 +29,8 @@ jobs:
           mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin
           mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
           
-          # 2. Скачиваем официальный стабильный пакет cmdline-tools от Google
-          wget https://google.com -O cmdline.zip
+          # 2. Скачиваем официальный стабильный пакет cmdline-tools от Google (ссылка в кавычках)
+          wget "https://google.com" -O cmdline.zip
           unzip cmdline.zip -d cmdline-extracted
           
           # 3. Раскладываем sdkmanager и его компоненты в папки, где их будет искать Buildozer
@@ -53,11 +53,11 @@ jobs:
           sed -i 's/package.name = myapp/package.name = goidaunlocker/g' buildozer.spec
           sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
           
-          # Указываем Buildozer использовать наш уже настроенный SDK и не пытаться качать новый
+          # Указываем Buildozer использовать наш уже настроенный SDK
           sed -i 's/.*android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
           sed -i 's/.*android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
 
       - name: Build APK
         run: |
-          # Запускаем сборку. Buildozer увидит готовый sdkmanager и сразу перейдет к компиляции
+          # Запускаем сборку
           buildozer -v android debug
