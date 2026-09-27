@@ -16,40 +16,42 @@ jobs:
       - name: Install Buildozer dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake wget
 
       - name: Install Buildozer and tools
         run: |
           pip install --upgrade pip
           pip install buildozer cython
 
+      - name: Pre-install Android SDK Build-Tools 34 (Fix Aidl)
+        run: |
+          # Вручную создаем структуру папок, которую ожидает Buildozer
+          mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0
+          
+          # Скачиваем официальные стабильные инструменты Google (34-ю версию)
+          wget https://google.com -O build-tools.zip
+          unzip build-tools.zip
+          
+          # Обманываем Buildozer: подсовываем стабильные файлы (включая утилиту aidl) в папку 37.0.0
+          cp -r android-14/* ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0/
+          
+          # Проверяем, что обман сработал и файл на месте
+          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0/aidl
+          echo "Утилита Aidl успешно внедрена вручную!"
+
       - name: Init and Configure Buildozer
         run: |
           buildozer init
-          
-          # Настройка базовых параметров
           sed -i 's/title = My Application/title = Goida AI Unlocker/g' buildozer.spec
           sed -i 's/package.name = myapp/package.name = goidaunlocker/g' buildozer.spec
           sed -i 's/requirements = python3,kivy/requirements = python3,kivy,pyjnius/g' buildozer.spec
-          
-          # Принудительно выставляем жесткие стабильные версии Android 14, стирая старые строки
-          sed -i 's/.*android.api =.*/android.api = 34/g' buildozer.spec
-          sed -i 's/.*android.build_tools_version =.*/android.build_tools_version = 34.0.0/g' buildozer.spec
-          
-          # Включаем автоматическое принятие лицензий на уровне самого Buildozer
           sed -i 's/.*android.accept_sdk_license =.*/android.accept_sdk_license = True/g' buildozer.spec
-          
-          # Добавляем права доступа к VPN и Интернету
           sed -i 's/.*android.permissions =.*/android.permissions = INTERNET, BIND_VPN_SERVICE/g' buildozer.spec
 
       - name: Build APK
         run: |
-          # Включаем глобальный флаг для автоматического принятия всех лицензий Android SDK на уровне ядра Linux
-          export ANDROID_LAUNCHER_ACCEPT_SDK_LICENSE=1
+          # Запуск сборки
           buildozer -v android debug
-        env:
-          # Дополнительный системный флаг для автоматизации Java/Gradle инструментов
-          AUTO_ACCEPT_AND_CONTINUE: "y"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
